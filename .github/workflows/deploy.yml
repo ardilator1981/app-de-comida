@@ -1,0 +1,44 @@
+# Publica la app en GitHub Pages.
+# Requiere activar Settings → Pages → Source: GitHub Actions.
+name: Publicar en GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Si se lanzan varios despliegues, deja terminar el que está en curso.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Comprobar que los iconos están generados
+        run: |
+          test -f icons/icon-192.png
+          test -f icons/icon-512.png
+          test -f icons/icon-maskable-512.png
+
+      - uses: actions/configure-pages@v5
+
+      - name: Subir el sitio
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Desplegar
+        id: despliegue
+        uses: actions/deploy-pages@v4
