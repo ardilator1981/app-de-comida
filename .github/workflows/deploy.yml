@@ -4,7 +4,12 @@ name: Publicar en GitHub Pages
 
 on:
   push:
-    branches: [main, master]
+    # La rama principal de este repositorio. Se incluyen main/master por si
+    # algún día se renombra o se fusiona el trabajo allí.
+    branches:
+      - claude/recipe-app-shopping-list-7jzsuy
+      - main
+      - master
   workflow_dispatch:
 
 permissions:

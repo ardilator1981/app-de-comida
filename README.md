@@ -58,10 +58,13 @@ Después:
 
 Al ser una web estática vale cualquier hosting. Con **GitHub Pages**:
 
-1. En el repositorio: **Settings → Pages → Source: GitHub Actions**.
-2. Fusiona esta rama en la rama principal. El flujo de trabajo
-   `.github/workflows/deploy.yml` publica la app en cada cambio.
-3. La dirección será `https://<usuario>.github.io/<repositorio>/`.
+1. Abre <https://github.com/ardilator1981/app-de-comida/settings/pages>
+   (es la pestaña **Settings** del repositorio en github.com, y dentro
+   **Pages** en la columna de la izquierda).
+2. En **Source**, elige **GitHub Actions**.
+3. Ya está. El flujo `.github/workflows/deploy.yml` publica la app en cada
+   cambio que se suba a la rama principal.
+4. La dirección será `https://ardilator1981.github.io/app-de-comida/`.
 
 > La app **necesita HTTPS** para instalarse y para recibir recetas compartidas.
 > GitHub Pages ya lo da.
