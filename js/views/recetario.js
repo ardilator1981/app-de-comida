@@ -1,8 +1,9 @@
 /** Vista principal: todas las recetas guardadas. */
+import { descargarCopia, estadoCopia, posponerAviso } from '../backup.js';
 import { alternarFavorita, obtener } from '../store.js';
 import { emojiDeReceta } from '../emoji.js';
 import { detectarPlataforma } from '../share.js';
-import { el, estadoVacio, icono, pintar } from '../ui.js';
+import { avisar, el, estadoVacio, icono, pintar } from '../ui.js';
 import { normalizar } from '../units.js';
 
 const filtros = { texto: '', etiqueta: '', soloFavoritas: false };
@@ -59,6 +60,48 @@ export function tarjetaReceta(receta, alAbrir, { compacta = false } = {}) {
     );
   }
   return tarjeta;
+}
+
+/**
+ * Recordatorio de copia de seguridad. Devuelve null cuando no toca avisar,
+ * que es casi siempre: solo aparece si hay recetas que valga la pena proteger
+ * y hace más de un mes de la última copia.
+ */
+function avisoCopia(alCerrar) {
+  const { nunca, dias, tocaAvisar } = estadoCopia();
+  if (!tocaAvisar) return null;
+
+  return el('div', { class: 'aviso-copia' }, [
+    el('span', { class: 'aviso-copia-emoji', text: '💾' }),
+    el('div', { class: 'aviso-copia-texto' }, [
+      el('strong', { text: 'Guarda una copia de tus recetas' }),
+      el('p', {
+        text: nunca
+          ? `Llevas ${dias} días usando la app sin descargar ninguna copia. Si se borran los datos del navegador o cambias de móvil, perderías el recetario.`
+          : `Hace ${dias} días de tu última copia. Si se borran los datos del navegador o cambias de móvil, perderías lo guardado desde entonces.`,
+      }),
+      el('div', { class: 'fila-botones' }, [
+        el('button', {
+          class: 'boton boton-primario boton-pequeno',
+          type: 'button',
+          onclick: () => {
+            descargarCopia();
+            avisar('Copia descargada');
+            alCerrar();
+          },
+        }, [icono('descargar', 16), 'Descargar copia']),
+        el('button', {
+          class: 'boton boton-fantasma boton-pequeno',
+          type: 'button',
+          text: 'Ahora no',
+          onclick: () => {
+            posponerAviso();
+            alCerrar();
+          },
+        }),
+      ]),
+    ]),
+  ]);
 }
 
 /** Filtra el recetario según la búsqueda activa. */
@@ -125,6 +168,12 @@ export function vista(ctx) {
       )
     );
   };
+
+  // El recordatorio va lo primero, pero se quita solo al resolverlo.
+  const ranuraAviso = el('div');
+  const dibujarAviso = () => pintar(ranuraAviso, avisoCopia(dibujarAviso));
+  dibujarAviso();
+  contenido.append(ranuraAviso);
 
   if (recetas.length) {
     const entrada = el('input', {

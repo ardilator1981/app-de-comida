@@ -118,5 +118,10 @@ Nunca acierta al 100 %, por eso todo queda editable antes de guardar.
 
 ### Copias de seguridad
 
-Los datos viven solo en el móvil. En **Ajustes** puedes descargar un archivo
-`.json` con todo e importarlo en otro dispositivo.
+Los datos viven solo en el móvil, así que se pierden si se borran los datos
+del navegador o si cambias de teléfono. En **Ajustes** puedes descargar un
+archivo `.json` con todo e importarlo en otro dispositivo.
+
+La app lo recuerda sola: si han pasado más de 30 días desde la última copia
+(y hay al menos 3 recetas que perder), aparece un aviso en el recetario.
+Con «Ahora no» se calla una semana.

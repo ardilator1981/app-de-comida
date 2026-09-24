@@ -1,5 +1,6 @@
 /** Ajustes: instalación, copias de seguridad y ayuda. */
-import { borrarTodo, exportar, importar, obtener } from '../store.js';
+import { descargarCopia, resumenCopia } from '../backup.js';
+import { borrarTodo, importar, obtener } from '../store.js';
 import { abrirHoja, avisar, confirmar, el, icono } from '../ui.js';
 
 /** Instrucciones de instalación según el sistema del móvil. */
@@ -54,18 +55,6 @@ function ayudaInstalacion() {
   ];
 }
 
-function descargarCopia() {
-  const contenido = exportar();
-  const blob = new Blob([contenido], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const fecha = new Date().toISOString().slice(0, 10);
-  const enlace = el('a', { href: url, download: `recetario-${fecha}.json` });
-  document.body.append(enlace);
-  enlace.click();
-  enlace.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
 function abrirImportar(ctx) {
   const entrada = el('input', { type: 'file', accept: 'application/json,.json', style: { display: 'none' } });
   entrada.addEventListener('change', async () => {
@@ -110,7 +99,16 @@ export function vista(ctx) {
     el('section', { class: 'seccion' }, [
       el('h3', { text: 'Copia de seguridad' }),
       el('p', { class: 'texto-secundario', text: 'Las recetas viven solo en este móvil. Descarga una copia de vez en cuando, o para pasarlas a otro dispositivo.' }),
-      el('button', { class: 'tarjeta-ajuste', type: 'button', onclick: descargarCopia }, [
+      el('div', { class: 'aviso-caja' }, [el('strong', { text: resumenCopia() })]),
+      el('button', {
+        class: 'tarjeta-ajuste',
+        type: 'button',
+        onclick: () => {
+          descargarCopia();
+          avisar('Copia descargada');
+          ctx.redibujar();
+        },
+      }, [
         icono('descargar', 20),
         el('div', {}, [el('strong', { text: 'Descargar copia' }), el('small', { text: 'Guarda un archivo .json con todo' })]),
       ]),

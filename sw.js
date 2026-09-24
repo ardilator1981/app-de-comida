@@ -5,7 +5,7 @@
  * plano; las peticiones a otros dominios (miniaturas, oEmbed) van siempre
  * a la red y nunca se guardan.
  */
-const VERSION = 'recetario-v1';
+const VERSION = 'recetario-v2';
 const ARCHIVOS = [
   './',
   './index.html',
@@ -19,6 +19,7 @@ const ARCHIVOS = [
   './js/categories.js',
   './js/shopping.js',
   './js/dates.js',
+  './js/backup.js',
   './js/emoji.js',
   './js/share.js',
   './js/views/recetario.js',

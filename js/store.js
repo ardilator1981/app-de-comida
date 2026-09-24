@@ -25,6 +25,10 @@ const estadoInicial = () => ({
   },
   ajustes: {
     mostrarBienvenida: true,
+    /** Cuándo se descargó la última copia de seguridad (0 = nunca). */
+    ultimaCopia: 0,
+    /** Cuándo se pulsó "Ahora no" en el recordatorio de copia. */
+    avisoCopiaPospuesto: 0,
   },
 });
 

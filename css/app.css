@@ -771,6 +771,31 @@ textarea { min-height: 120px; resize: vertical; line-height: 1.55; }
 }
 .aviso-caja strong { color: var(--texto); }
 
+/* Recordatorio de copia de seguridad: presente pero sin alarmar. */
+.aviso-copia {
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+  margin: 6px 0 16px;
+  border: 1px solid var(--borde);
+  border-left: 4px solid var(--naranja);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  box-shadow: var(--sombra);
+}
+.aviso-copia-emoji { font-size: 1.4rem; line-height: 1.2; }
+.aviso-copia-texto { flex: 1; min-width: 0; }
+.aviso-copia-texto strong { display: block; margin-bottom: 4px; font-size: .95rem; }
+.aviso-copia-texto p {
+  margin: 0 0 12px;
+  color: var(--texto-2);
+  font-size: .85rem;
+  line-height: 1.45;
+}
+.aviso-copia .fila-botones { gap: 8px; flex-wrap: wrap; }
+/* Que cada botón ocupe lo que necesite, en vez de partirse en dos líneas. */
+.aviso-copia .fila-botones .boton { flex: 0 1 auto; }
+
 .tarjeta-ajuste {
   display: flex;
   align-items: center;
