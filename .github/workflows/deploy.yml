@@ -37,7 +37,11 @@ jobs:
           test -f icons/icon-512.png
           test -f icons/icon-maskable-512.png
 
+      # `enablement` activa Pages desde el propio flujo si aún no lo está,
+      # en lugar de fallar pidiendo que se active a mano.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: Subir el sitio
         uses: actions/upload-pages-artifact@v3
