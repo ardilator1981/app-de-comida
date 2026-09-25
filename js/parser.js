@@ -22,16 +22,16 @@ const CAB_INGREDIENTES = /^\W*(ingredientes?|lo que necesitas|necesitar[aá]s|ne
 const CAB_INGREDIENTES_INLINE = /^\W*(ingredientes?|lo que necesitas|necesitar[aá]s|necesitas)\b\s*:/i;
 // Acepta coletillas ("Elaboración paso a paso", "Preparación de la receta"):
 // las fichas de receta de los blogs casi nunca usan la palabra a secas.
-const CAB_PASOS = /^\W*(preparaci[oó]n|elaboraci[oó]n|pasos?|procedimiento|instrucciones|c[oó]mo se (hace|prepara)|modo de preparaci[oó]n|paso a paso)\b[^:\n]{0,28}:?\s*$/i;
+const CAB_PASOS = /^\W*(preparaci[oó]n|elaboraci[oó]n|pasos?|procedimiento|instrucciones|c[oó]mo (se )?(hacer?|preparar?|cocinar)|modo de preparaci[oó]n|paso a paso)\b[^:\n]{0,28}:?\s*$/i;
 const CAB_PASOS_INLINE = /^\W*(preparaci[oó]n|elaboraci[oó]n|pasos?|procedimiento|instrucciones|paso a paso)\b\s*:/i;
 /**
  * A partir de aquí la página ya no habla de la receta: tabla nutricional,
  * etiquetas, comentarios. Todo lo que venga después se descarta.
  */
-const CAB_FIN = /^\W*(informaci[oó]n nutricional|valor(es)? nutricional|nutrici[oó]n|palabras? clave|categor[ií]as?|comentarios?|deja un comentario|art[ií]culos relacionados|te puede interesar|s[ií]guenos|suscr[ií]bete|valoraci[oó]n)\b/i;
+const CAB_FIN = /^\W*(informaci[oó]n nutricional|valor(es)? nutricional|nutrici[oó]n|palabras? clave|categor[ií]as?|comentarios?|deja (un comentario|una respuesta)|art[ií]culos relacionados|(recetas|entradas|posts) relacionad|te puede interesar|otras recetas|s[ií]guenos|suscr[ií]bete|valoraci[oó]n|preguntas frecuentes|si te ha gustado|sobre (mí|mi|el autor)|pol[ií]tica de privacidad|aviso legal)\b/i;
 
 /** Secciones que no son ingredientes aunque lo parezcan. */
-const CAB_OMITIR = /^\W*(equipamiento|utensilios?|material(es)?|herramientas)\b\W*:?\s*$/i;
+const CAB_OMITIR = /^\W*(equipamiento|utensilios?|material(es)?|herramientas|[ií]ndice|tabla de contenidos?|contenidos?)\b\W*:?\s*$/i;
 
 /** Consejos del autor: se guardan como notas, no como pasos. */
 const CAB_NOTAS = /^\W*(notas?|consejos?|trucos?|sugerencias?|observaciones)\b\W*:?\s*$/i;
@@ -45,7 +45,17 @@ const RE_RUIDO_FICHA = new RegExp(
     '^\\W*(tiempo|raciones?|porciones|comensales|rinde|rendimiento|dificultad|coste)\\b',
     '^\\W*(calor[ií]as|kcal|carbohidratos|prote[ií]nas|grasas?)\\b',
     '^\\W*(autor|receta de|por)\\s*[:·]',
-    '^\\W*(imprimir|pinear|guardar|compartir|valorar|puntuar|a[ñn]adir a)\\b',
+    '^\\W*(imprimir|pinear|guardar|compartir|valorar|puntuar|p[uú]nt[uú]a|a[ñn]adir a)\\b',
+    '^\\W*(aceptar|rechazar|configurar|gestionar)\\s*(cookies)?\\s*$',
+    '^\\W*(utilizamos|usamos)\\s+cookies\\b',
+    '^\\W*(inicio|men[uú]|buscar|contacto|blog|portada|acceder|iniciar sesi[oó]n|reg[ií]strate|newsletter)\\s*$',
+    '^\\W*(publicado|actualizado|[uú]ltima actualizaci[oó]n)\\b',
+    '^\\W*dificultad\\b',
+    '^\\W*(tu direcci[oó]n de correo|nombre|correo|web|enviar comentario)\\s*$',
+    '^\\W*copyright\\b|^\\W*todos los derechos',
+    // Enlaces legales y de menú. El corte de pie de página ya se ha
+    // calculado antes de este filtro, así que silenciarlos no lo afecta.
+    '^\\W*(pol[ií]tica de (privacidad|cookies)|aviso legal|t[eé]rminos( y condiciones)?|sobre (m[ií]|nosotros)|qui[eé]nes somos|mapa del sitio)\\s*$',
     '^\\s*\\d+([.,]\\d+)?\\s*(de|\\/)\\s*\\d+\\s*(\\(|estrellas|votos)',
     '^\\W*\\d+\\s*(votos?|comentarios?|valoraciones?)\\s*$',
   ].join('|'),
@@ -240,9 +250,18 @@ export function parseReceta(texto, pistas = {}) {
 
   const lineasBrutas = bruto.split('\n');
 
-  // Las páginas de recetas siguen con tabla nutricional, etiquetas y
-  // comentarios: nada de eso es la receta, así que se corta ahí.
-  const corte = lineasBrutas.findIndex((l) => CAB_FIN.test(limpiarLinea(quitarEmojis(l))));
+  const limpias = lineasBrutas.map((l) => limpiarLinea(quitarEmojis(l)));
+
+  // Tras la receta viene tabla nutricional, comentarios y pie de página, y
+  // nada de eso interesa. Pero "Sobre mí" o "Aviso legal" también están en el
+  // menú de arriba, así que solo se corta una vez empezada la receta: si no,
+  // un enlace de navegación se llevaría por delante la receta entera.
+  const inicioReceta = limpias.findIndex((l) => l && (CAB_INGREDIENTES.test(l) || CAB_PASOS.test(l)));
+  let corte = -1;
+  if (inicioReceta !== -1) {
+    const relativo = limpias.slice(inicioReceta + 1).findIndex((l) => l && CAB_FIN.test(l));
+    if (relativo !== -1) corte = inicioReceta + 1 + relativo;
+  }
   const utiles = corte > 0 ? lineasBrutas.slice(0, corte) : lineasBrutas;
 
   // Los consejos del autor se guardan como notas, no como pasos.
@@ -392,15 +411,26 @@ export function parseReceta(texto, pistas = {}) {
   // --- Título ---
   let titulo = (pistas.titulo || '').trim();
   if (!titulo) {
-    for (const { texto: t, tipo } of cuerpo) {
-      if (!t || tipo === 'cab-ing' || tipo === 'cab-pasos') continue;
+    // Antes se cogía la primera línea válida, que en una web es el menú
+    // ("Inicio", "Recetas"). El título real es la línea más descriptiva que
+    // hay por encima de los ingredientes: ni una palabra suelta de un menú,
+    // ni un párrafo de introducción.
+    const limite = iIng !== -1 ? iIng : Math.min(cuerpo.length, 8);
+    const candidatos = [];
+    for (let i = 0; i < limite; i++) {
+      const { texto: t, tipo } = cuerpo[i];
+      if (!t || tipo === 'cab-ing' || tipo === 'cab-pasos' || tipo === 'subcab') continue;
       const limpio = quitarEmojis(t).replace(/[:.!¡]+$/, '').trim();
-      if (limpio.length >= 3 && limpio.length <= 70 && !RE_EMPIEZA_CANTIDAD.test(limpio) && !pareceInstruccion(limpio)) {
-        titulo = limpio;
-        break;
-      }
+      if (limpio.length < 5 || limpio.length > 70) continue;
+      const palabras = limpio.split(/\s+/).filter(Boolean).length;
+      if (palabras < 2 || palabras > 10) continue;
+      if (RE_EMPIEZA_CANTIDAD.test(limpio) || pareceInstruccion(limpio)) continue;
+      candidatos.push({ limpio, palabras, i });
     }
+    candidatos.sort((a, b) => b.palabras - a.palabras || a.i - b.i);
+    if (candidatos.length) titulo = candidatos[0].limpio;
   }
+
   titulo = titulo ? limpiarTitulo(titulo) : 'Receta sin título';
 
   // --- Raciones y tiempo ---
