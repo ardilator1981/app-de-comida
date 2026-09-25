@@ -119,7 +119,20 @@ export function vista(ctx) {
   const actualizarInsignia = () => {
     const url = campoUrl.value.trim();
     const p = url ? detectarPlataforma(url) : null;
-    insigniaOrigen.textContent = p ? `${p.emoji} Receta de ${p.nombre}` : '';
+    if (!p) {
+      insigniaOrigen.textContent = '';
+    } else if (p.id === 'web') {
+      // Para una web cualquiera, el dominio dice más que la palabra "Web".
+      let dominio = url;
+      try {
+        dominio = new URL(url).hostname.replace(/^www\./, '');
+      } catch {
+        /* URL a medio escribir: se deja tal cual */
+      }
+      insigniaOrigen.textContent = `${p.emoji} ${dominio}`;
+    } else {
+      insigniaOrigen.textContent = `${p.emoji} Receta de ${p.nombre}`;
+    }
     botonLeer.hidden = !url;
   };
   campoUrl.addEventListener('input', actualizarInsignia);
