@@ -50,6 +50,13 @@ export function recogerCompartido() {
 }
 
 /**
+ * Plataformas que publican un oEmbed abierto del que se puede sacar la
+ * descripción del vídeo. Instagram exige credenciales de empresa y Facebook
+ * no lo ofrece, así que de esas solo se guarda el enlace.
+ */
+export const PLATAFORMAS_LEIBLES = ['tiktok', 'youtube'];
+
+/**
  * Intenta recuperar título y miniatura del enlace mediante oEmbed público.
  * Es un extra: si la red o CORS lo impiden, la app sigue funcionando igual.
  * @param {string} url

@@ -1,6 +1,6 @@
 /** Alta y edición de recetas, con análisis del texto pegado de redes. */
 import { parseReceta } from '../parser.js';
-import { detectarPlataforma, extraerUrl, pedirMetadatos } from '../share.js';
+import { detectarPlataforma, extraerUrl, pedirMetadatos, PLATAFORMAS_LEIBLES } from '../share.js';
 import { guardarReceta, recetaPorId } from '../store.js';
 import { avisar, el, icono, pintar } from '../ui.js';
 import { buscarUnidad, formatearCantidad, parseCantidad } from '../units.js';
@@ -107,13 +107,85 @@ export function vista(ctx) {
     value: borrador.url,
     inputmode: 'url',
   });
+
   const insigniaOrigen = el('span', { class: 'texto-pequeno' });
+  const estadoEnlace = el('div', { class: 'estado-enlace', hidden: true });
+  const botonLeer = el('button', {
+    class: 'boton boton-fantasma boton-pequeno',
+    type: 'button',
+    onclick: () => leerDelEnlace(),
+  }, [icono('chispa', 16), 'Leer del enlace']);
+
   const actualizarInsignia = () => {
-    const p = campoUrl.value.trim() ? detectarPlataforma(campoUrl.value.trim()) : null;
+    const url = campoUrl.value.trim();
+    const p = url ? detectarPlataforma(url) : null;
     insigniaOrigen.textContent = p ? `${p.emoji} Receta de ${p.nombre}` : '';
+    botonLeer.hidden = !url;
   };
   campoUrl.addEventListener('input', actualizarInsignia);
-  actualizarInsignia();
+
+  /** Pinta el estado de la lectura del enlace. */
+  const mostrarEstado = (tipo, ...contenido) => {
+    estadoEnlace.hidden = false;
+    estadoEnlace.className = `estado-enlace estado-${tipo}`;
+    pintar(estadoEnlace, contenido.flat().filter(Boolean));
+  };
+
+  /**
+   * Pide la descripción del vídeo a la plataforma y, si llega, la analiza
+   * sola. Es el camino corto: compartir el vídeo y que salga la receta.
+   */
+  async function leerDelEnlace() {
+    const url = campoUrl.value.trim();
+    if (!url) return;
+    const plataforma = detectarPlataforma(url);
+
+    if (!PLATAFORMAS_LEIBLES.includes(plataforma?.id)) {
+      mostrarEstado(
+        'aviso',
+        el('strong', { text: `${plataforma?.nombre || 'Esta web'} no permite leer la descripción` }),
+        el('p', { text: 'Copia el texto de la receta y pégalo aquí abajo; yo me encargo del resto.' })
+      );
+      return;
+    }
+
+    botonLeer.disabled = true;
+    mostrarEstado('cargando', el('span', { text: `Buscando la descripción en ${plataforma.nombre}…` }));
+
+    const datos = await pedirMetadatos(url);
+    botonLeer.disabled = false;
+
+    if (!datos || !datos.titulo) {
+      mostrarEstado(
+        'aviso',
+        el('strong', { text: `${plataforma.nombre} no me ha dado la descripción` }),
+        el('p', { text: 'Puede ser un vídeo privado, un enlace acortado o que la app no responda ahora mismo. Pega el texto de la receta aquí abajo y funcionará igual.' }),
+        el('button', { class: 'boton boton-fantasma boton-pequeno', type: 'button', text: 'Reintentar', onclick: () => leerDelEnlace() })
+      );
+      return;
+    }
+
+    if (datos.imagen && !campoImagen.value.trim()) campoImagen.value = datos.imagen;
+    if (datos.autor) borrador.fuente = `@${datos.autor}`;
+    if (!areaTexto.value.trim()) areaTexto.value = datos.titulo;
+
+    // La descripción ya está: la analizamos sin que haya que pulsar nada.
+    const leida = analizar({ silencioso: true });
+
+    if (leida && leida.ingredientes.length) {
+      mostrarEstado(
+        'ok',
+        el('strong', { text: `Receta leída de ${plataforma.nombre}` }),
+        el('p', { text: `${leida.ingredientes.length} ingredientes y ${leida.pasos.length} pasos. Repásalos abajo por si algo no cuadra.` })
+      );
+    } else {
+      mostrarEstado(
+        'aviso',
+        el('strong', { text: 'La descripción no trae los ingredientes' }),
+        el('p', { text: 'Este vídeo explica la receta hablando o con texto dentro de la imagen, y eso no viaja en el enlace. Escríbelos abajo a mano.' })
+      );
+    }
+  }
 
   const areaTexto = el('textarea', {
     placeholder:
@@ -122,17 +194,23 @@ export function vista(ctx) {
   });
   if (compartido?.texto) areaTexto.value = compartido.texto;
 
-  const analizar = () => {
+  /**
+   * Lee el texto pegado y rellena el formulario.
+   * @param {{silencioso?: boolean}} [opciones] - sin avisos emergentes cuando
+   *   la llamada viene de la lectura automática del enlace.
+   * @returns {object|null} la receta interpretada
+   */
+  const analizar = ({ silencioso = false } = {}) => {
     const texto = areaTexto.value.trim();
     if (!texto) {
-      avisar('Pega primero el texto de la receta');
-      return;
+      if (!silencioso) avisar('Pega primero el texto de la receta');
+      return null;
     }
     const leida = parseReceta(texto, {
       titulo: campoTitulo.value.trim() || undefined,
       url: campoUrl.value.trim() || undefined,
     });
-    campoTitulo.value = leida.titulo === 'Receta sin título' ? campoTitulo.value : leida.titulo;
+    if (leida.titulo !== 'Receta sin título') campoTitulo.value = leida.titulo;
     if (leida.raciones) campoRaciones.value = leida.raciones;
     if (leida.minutos) campoMinutos.value = leida.minutos;
     if (leida.etiquetas.length && !campoEtiquetas.value.trim()) campoEtiquetas.value = leida.etiquetas.join(', ');
@@ -144,23 +222,27 @@ export function vista(ctx) {
     borrador.pasos = leida.pasos;
     dibujarIngredientes();
     dibujarPasos();
-    avisar(
-      leida.ingredientes.length
-        ? `He encontrado ${leida.ingredientes.length} ingredientes y ${leida.pasos.length} pasos`
-        : 'No he reconocido ingredientes: revísalos abajo'
-    );
+    if (!silencioso) {
+      avisar(
+        leida.ingredientes.length
+          ? `He encontrado ${leida.ingredientes.length} ingredientes y ${leida.pasos.length} pasos`
+          : 'No he reconocido ingredientes: revísalos abajo'
+      );
+    }
     detalles.open = true;
+    return leida;
   };
 
   contenido.append(
     el('section', { class: 'seccion' }, [
       el('label', { class: 'campo' }, [el('span', { text: 'Enlace original' }), campoUrl]),
-      insigniaOrigen,
+      el('div', { class: 'fila-enlace' }, [insigniaOrigen, botonLeer]),
+      estadoEnlace,
       el('label', { class: 'campo', style: { marginTop: '12px' } }, [
         el('span', { text: 'Texto de la receta' }),
         areaTexto,
       ]),
-      el('button', { class: 'boton boton-primario boton-bloque', type: 'button', onclick: analizar }, [
+      el('button', { class: 'boton boton-primario boton-bloque', type: 'button', onclick: () => analizar() }, [
         icono('chispa', 18),
         'Analizar y rellenar',
       ]),
@@ -299,20 +381,11 @@ export function vista(ctx) {
     ])
   );
 
-  // Si viene de una compartición con enlace, intentamos título e imagen.
+  actualizarInsignia();
+
+  // Si llega un enlace compartido, se lee solo: compartir y listo.
   if (!editando && borrador.url) {
-    pedirMetadatos(borrador.url).then((datos) => {
-      if (!datos) return;
-      if (datos.titulo && !campoTitulo.value.trim()) {
-        campoTitulo.value = datos.titulo.slice(0, 90);
-      }
-      if (datos.imagen && !campoImagen.value.trim()) campoImagen.value = datos.imagen;
-      if (datos.autor) borrador.fuente = `@${datos.autor}`;
-      if (!areaTexto.value.trim() && datos.titulo) {
-        // La descripción de TikTok suele venir en el título del oEmbed.
-        areaTexto.value = datos.titulo;
-      }
-    });
+    leerDelEnlace();
   }
 
   // Un enlace suelto compartido sin texto: dejamos todo listo para pegar.
