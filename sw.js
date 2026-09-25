@@ -5,7 +5,14 @@
  * plano; las peticiones a otros dominios (miniaturas, oEmbed) van siempre
  * a la red y nunca se guardan.
  */
-const VERSION = 'recetario-v2';
+/**
+ * La marca la sustituye el flujo de publicación por el identificador del
+ * cambio. Así cada despliegue genera un archivo distinto, el navegador lo
+ * detecta, tira la caché anterior y sirve la versión nueva. Sin esto, el
+ * móvil seguiría dando la versión antigua hasta abrir la app dos veces.
+ */
+const COMPILACION = '__COMPILACION__';
+const VERSION = `recetario-${COMPILACION === '__COMPI' + 'LACION__' ? 'desarrollo' : COMPILACION}`;
 const ARCHIVOS = [
   './',
   './index.html',

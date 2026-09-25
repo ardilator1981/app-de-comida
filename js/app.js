@@ -7,7 +7,7 @@
 import { recogerCompartido } from './share.js';
 import { generarLista } from './shopping.js';
 import { cargar, obtener, suscribir } from './store.js';
-import { el, icono, pintar } from './ui.js';
+import { avisar, el, icono, pintar } from './ui.js';
 
 import * as vistaRecetario from './views/recetario.js';
 import * as vistaReceta from './views/receta.js';
@@ -157,9 +157,37 @@ function arrancar() {
 function registrarServicio() {
   if (!('serviceWorker' in navigator)) return;
   if (location.protocol !== 'https:' && location.hostname !== 'localhost') return;
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch((error) => {
+
+  window.addEventListener('load', async () => {
+    let registro;
+    try {
+      registro = await navigator.serviceWorker.register('./sw.js');
+    } catch (error) {
       console.warn('No se pudo registrar el service worker', error);
+      return;
+    }
+
+    // En la primera visita no hay nada que actualizar: solo avisamos cuando
+    // ya había una versión funcionando y llega otra.
+    const habiaVersionPrevia = Boolean(navigator.serviceWorker.controller);
+
+    registro.addEventListener('updatefound', () => {
+      const entrante = registro.installing;
+      if (!entrante) return;
+      entrante.addEventListener('statechange', () => {
+        if (entrante.state === 'activated' && habiaVersionPrevia) {
+          avisar('Hay una versión nueva de la app', {
+            accion: 'Actualizar',
+            alPulsar: () => location.reload(),
+          });
+        }
+      });
+    });
+
+    // Al volver a la app, comprobar si hay algo nuevo: una app instalada
+    // puede pasar semanas abierta sin recargarse nunca.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') registro.update().catch(() => {});
     });
   });
 }

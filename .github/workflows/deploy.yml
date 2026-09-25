@@ -39,6 +39,13 @@ jobs:
 
       # `enablement` activa Pages desde el propio flujo si aún no lo está,
       # en lugar de fallar pidiendo que se active a mano.
+      # Sella el service worker con este commit: sin esto los móviles
+      # seguirían sirviendo la versión anterior desde su caché.
+      - name: Sellar la versión en el service worker
+        run: |
+          sed -i "s/__COMPILACION__/${GITHUB_SHA::7}/" sw.js
+          grep -q "${GITHUB_SHA::7}" sw.js || { echo "No se pudo sellar sw.js"; exit 1; }
+
       - uses: actions/configure-pages@v5
         with:
           enablement: true
