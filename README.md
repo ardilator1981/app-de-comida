@@ -1,7 +1,7 @@
 # 🍲 Recetario
 
-App para guardar las recetas que ves en **TikTok e Instagram**, organizar la semana
-y sacar la **lista de la compra** automáticamente.
+App para guardar recetas de internet, organizar la semana y sacar la
+**lista de la compra** automáticamente.
 
 Funciona como aplicación instalable en el móvil (PWA): sin registro, sin servidor
 y sin conexión. Todo se guarda en el propio dispositivo.
@@ -12,8 +12,8 @@ y sin conexión. Todo se guarda en el propio dispositivo.
 
 | | |
 |---|---|
-| **📥 Recibe recetas compartidas** | Al instalarla, la app aparece en el menú *Compartir* de TikTok e Instagram. Le mandas el vídeo y se abre con el enlace listo. |
-| **🪄 Lee la receta sola** | Pegas la descripción del vídeo y detecta el título, las raciones, el tiempo, los **ingredientes con sus cantidades** y los **pasos**. |
+| **📥 Recibe recetas compartidas** | Al instalarla, aparece en el menú *Compartir* del móvil. Selecciona la receta en cualquier web, compártela con la app y se rellena sola. |
+| **🪄 Lee la receta sola** | Detecta el título, las raciones, el tiempo, los **ingredientes con sus cantidades**, los **pasos** y las notas, y descarta valoraciones, botones y tablas nutricionales. |
 | **📖 Recetario** | Todas tus recetas con buscador por nombre *o por ingrediente*, etiquetas y favoritas. |
 | **🗓️ Semana** | Colocas cada receta en su día, en la comida o en la cena. Desde ahí abres la receta para cocinar. |
 | **🛒 Lista de la compra** | Suma los ingredientes de todas las recetas de la semana (250 g + 1 kg = 1,25 kg), los agrupa por secciones del súper y los puedes ir tachando. |
@@ -102,16 +102,34 @@ js/
 tools/make-icons.mjs    Genera los iconos PNG del PWA
 ```
 
+### De dónde salen las recetas
+
+**Webs y blogs de recetas** son la mejor fuente: puedes seleccionar el texto
+y compartirlo con la app, y el analizador entiende las fichas de receta que
+usan casi todos los blogs.
+
+**TikTok e Instagram no dejan leer su contenido desde una web.** Es una regla
+de seguridad de los navegadores: una página solo puede leer datos de otro
+sitio si ese sitio da permiso, y ellos no lo dan. Las apps que sí lo
+consiguen tienen un servidor propio que descarga la página —un servidor no
+está sujeto a esa regla—, y las mejores además transcriben el audio del
+vídeo. Aquí la app intenta pedir la descripción a TikTok por su oEmbed
+público, pero lo normal es que no llegue; en ese caso se guarda el enlace y
+los ingredientes se escriben a mano.
+
 ### Sobre el analizador
 
-Las descripciones de redes no tienen formato fijo, así que `parser.js` trabaja por capas:
+Las recetas de internet no tienen formato fijo, así que `parser.js` trabaja por capas:
 
 1. Busca cabeceras explícitas (`INGREDIENTES`, `PREPARACIÓN`, `Para la salsa:`).
 2. Si no las hay, clasifica línea a línea: las que empiezan por cantidad o son
    cortas van a ingredientes; las que empiezan por un verbo de cocina
    («precalienta», «cuece», «vierte») van a pasos.
-3. Descarta enlaces, hashtags, menciones y reclamos («sígueme», «link en bio»).
-4. De cada ingrediente separa **cantidad**, **unidad**, **nombre** y **nota**
+3. Descarta enlaces, hashtags, menciones, reclamos («sígueme», «link en bio»)
+   y el envoltorio de los blogs: valoraciones, botones de imprimir, tablas
+   nutricionales y todo lo que viene después de la receta.
+4. Separa las secciones de «Notas» o «Consejos» y las guarda como notas.
+5. De cada ingrediente separa **cantidad**, **unidad**, **nombre** y **nota**
    (`2 tomates, picados` → 2 · — · tomates · *picados*).
 
 Nunca acierta al 100 %, por eso todo queda editable antes de guardar.

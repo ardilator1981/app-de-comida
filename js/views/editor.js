@@ -141,10 +141,11 @@ export function vista(ctx) {
     const plataforma = detectarPlataforma(url);
 
     if (!PLATAFORMAS_LEIBLES.includes(plataforma?.id)) {
+      const nombre = !plataforma || plataforma.id === 'web' ? 'Esta web' : plataforma.nombre;
       mostrarEstado(
         'aviso',
-        el('strong', { text: `${plataforma?.nombre || 'Esta web'} no permite leer la descripción` }),
-        el('p', { text: 'Copia el texto de la receta y pégalo aquí abajo; yo me encargo del resto.' })
+        el('strong', { text: `${nombre} no deja leer la receta desde el enlace` }),
+        el('p', { text: 'Selecciona los ingredientes y los pasos en la página, compártelos con la app o pégalos aquí abajo.' })
       );
       return;
     }
@@ -189,7 +190,7 @@ export function vista(ctx) {
 
   const areaTexto = el('textarea', {
     placeholder:
-      'Pega aquí la descripción del vídeo (ingredientes y pasos).\n\nEn TikTok/Instagram: mantén pulsada la descripción → Copiar.',
+      'Pega aquí la receta: ingredientes y pasos.\n\nEn una web de recetas puedes seleccionar el texto y compartirlo directamente con esta app.',
     'aria-label': 'Texto de la receta',
   });
   if (compartido?.texto) areaTexto.value = compartido.texto;
@@ -214,6 +215,7 @@ export function vista(ctx) {
     if (leida.raciones) campoRaciones.value = leida.raciones;
     if (leida.minutos) campoMinutos.value = leida.minutos;
     if (leida.etiquetas.length && !campoEtiquetas.value.trim()) campoEtiquetas.value = leida.etiquetas.join(', ');
+    if (leida.notas && !campoNotas.value.trim()) campoNotas.value = leida.notas;
     if (!campoUrl.value.trim() && leida.url) {
       campoUrl.value = leida.url;
       actualizarInsignia();
@@ -249,7 +251,7 @@ export function vista(ctx) {
       el('p', {
         class: 'texto-pequeno centrado',
         style: { marginTop: '8px' },
-        text: 'Leo los ingredientes y los pasos automáticamente. Después puedes corregir lo que haga falta.',
+        text: 'Leo los ingredientes y los pasos automáticamente, y descarto valoraciones, botones y tablas nutricionales. Después puedes corregir lo que haga falta.',
       }),
     ])
   );
@@ -383,9 +385,28 @@ export function vista(ctx) {
 
   actualizarInsignia();
 
-  // Si llega un enlace compartido, se lee solo: compartir y listo.
-  if (!editando && borrador.url) {
-    leerDelEnlace();
+  if (!editando) {
+    if (areaTexto.value.trim()) {
+      // Ya nos han compartido el texto de la receta: no hay nada que pedirle
+      // al enlace, así que se analiza directamente.
+      const leida = analizar({ silencioso: true });
+      if (leida && leida.ingredientes.length) {
+        mostrarEstado(
+          'ok',
+          el('strong', { text: 'Receta leída' }),
+          el('p', { text: `${leida.ingredientes.length} ingredientes y ${leida.pasos.length} pasos. Repásalos abajo por si algo no cuadra.` })
+        );
+      } else {
+        mostrarEstado(
+          'aviso',
+          el('strong', { text: 'No he reconocido los ingredientes' }),
+          el('p', { text: 'Puede que falte parte del texto. Revísalo aquí abajo y vuelve a pulsar “Analizar y rellenar”.' })
+        );
+      }
+    } else if (borrador.url) {
+      // Solo tenemos el enlace: probamos a que la plataforma nos dé el texto.
+      leerDelEnlace();
+    }
   }
 
   // Un enlace suelto compartido sin texto: dejamos todo listo para pegar.

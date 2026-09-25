@@ -133,7 +133,7 @@ export function vista(ctx) {
           emoji: '📱',
           titulo: 'Tu recetario está vacío',
           mensaje:
-            'Comparte un vídeo de TikTok o Instagram con esta app, o pega la receta a mano, y la guardaré aquí.',
+            'Busca una receta en internet, selecciona los ingredientes y los pasos y compártelos con esta app. Los leeré y los guardaré aquí.',
           accion: 'Añadir mi primera receta',
           alPulsar: () => ctx.ir('#/nueva'),
         }),
@@ -141,7 +141,7 @@ export function vista(ctx) {
           el('button', {
             class: 'boton boton-fantasma boton-pequeno',
             type: 'button',
-            text: 'Cómo mandar recetas desde TikTok',
+            text: 'Cómo mandar recetas a la app',
             onclick: () => ctx.ir('#/ajustes'),
           }),
         ])

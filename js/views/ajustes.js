@@ -3,6 +3,23 @@ import { descargarCopia, resumenCopia } from '../backup.js';
 import { borrarTodo, importar, obtener } from '../store.js';
 import { abrirHoja, avisar, confirmar, el, icono } from '../ui.js';
 
+/** De dónde salen las recetas, según lo que cada sitio permite de verdad. */
+function ayudaFuentes() {
+  return [
+    el('p', {}, [
+      el('strong', { text: 'Webs y blogs de recetas: ' }),
+      'es la mejor fuente con diferencia. Selecciona con el dedo los ingredientes y los pasos, pulsa ',
+      el('strong', { text: 'Compartir' }),
+      ' y elige Recetario. También puedes copiarlos y pegarlos en “Texto de la receta”.',
+    ]),
+    el('p', { class: 'texto-secundario', text: 'Entiendo las fichas de receta de los blogs: me quedo con los ingredientes, los pasos y los consejos, y descarto valoraciones, botones y tablas nutricionales.' }),
+    el('p', {}, [
+      el('strong', { text: 'TikTok e Instagram: ' }),
+      'comparte el vídeo y guardaré el enlace para tenerlo a mano. Intentaré leer la descripción, pero estas apps no dejan que una web acceda a su contenido, así que lo normal es que los ingredientes haya que escribirlos.',
+    ]),
+  ];
+}
+
 /** Instrucciones de instalación según el sistema del móvil. */
 function ayudaInstalacion() {
   const ua = navigator.userAgent;
@@ -90,7 +107,11 @@ export function vista(ctx) {
 
   contenido.append(
     el('section', { class: 'seccion' }, [
-      el('h3', { text: 'Cómo mandar recetas desde TikTok o Instagram' }),
+      el('h3', { text: 'De dónde sacar las recetas' }),
+      el('div', { class: 'aviso-caja', style: { marginTop: '10px' } }, ayudaFuentes()),
+    ]),
+    el('section', { class: 'seccion' }, [
+      el('h3', { text: 'Instalar la app en el móvil' }),
       el('div', { class: 'aviso-caja', style: { marginTop: '10px' } }, ayudaInstalacion()),
     ])
   );
@@ -127,7 +148,7 @@ export function vista(ctx) {
         type: 'button',
         onclick: () =>
           abrirHoja('Cómo funciona', () => [
-            el('p', {}, [el('strong', { text: '1. Guarda. ' }), 'Comparte el vídeo con la app o pega la descripción; se leen solos los ingredientes y los pasos.']),
+            el('p', {}, [el('strong', { text: '1. Guarda. ' }), 'Selecciona la receta en cualquier web y compártela con la app, o pégala a mano; se leen solos los ingredientes y los pasos.']),
             el('p', {}, [el('strong', { text: '2. Planifica. ' }), 'En “Semana”, coloca cada receta en su día, en la comida o en la cena.']),
             el('p', {}, [el('strong', { text: '3. Compra. ' }), 'La lista suma los ingredientes de todas las recetas de la semana y los ordena por secciones del súper.']),
             el('p', {}, [el('strong', { text: '4. Cocina. ' }), 'Abre la receta desde el día correspondiente y ve tachando ingredientes y pasos.']),

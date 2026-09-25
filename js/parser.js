@@ -18,10 +18,40 @@ const RE_HASHTAG = /#[\p{L}\p{N}_]+/gu;
 const RE_URL = /https?:\/\/[^\s]+/gi;
 const RE_ARROBA = /(?:^|\s)@[\p{L}\p{N}._]+/gu;
 
-const CAB_INGREDIENTES = /^\W*(ingredientes?|lo que necesitas|necesitar[aá]s|necesitas|para la masa|para el relleno|para la salsa|para el alino|para el aliño|materiales)\b\W*:?\s*$/i;
+const CAB_INGREDIENTES = /^\W*(ingredientes?|lo que necesitas|necesitar[aá]s|necesitas|para la masa|para el relleno|para la salsa|para el alino|para el aliño)\b[^:\n]{0,28}:?\s*$/i;
 const CAB_INGREDIENTES_INLINE = /^\W*(ingredientes?|lo que necesitas|necesitar[aá]s|necesitas)\b\s*:/i;
-const CAB_PASOS = /^\W*(preparaci[oó]n|elaboraci[oó]n|pasos?|procedimiento|instrucciones|c[oó]mo se hace|modo de preparaci[oó]n|receta|paso a paso)\b\W*:?\s*$/i;
+// Acepta coletillas ("Elaboración paso a paso", "Preparación de la receta"):
+// las fichas de receta de los blogs casi nunca usan la palabra a secas.
+const CAB_PASOS = /^\W*(preparaci[oó]n|elaboraci[oó]n|pasos?|procedimiento|instrucciones|c[oó]mo se (hace|prepara)|modo de preparaci[oó]n|paso a paso)\b[^:\n]{0,28}:?\s*$/i;
 const CAB_PASOS_INLINE = /^\W*(preparaci[oó]n|elaboraci[oó]n|pasos?|procedimiento|instrucciones|paso a paso)\b\s*:/i;
+/**
+ * A partir de aquí la página ya no habla de la receta: tabla nutricional,
+ * etiquetas, comentarios. Todo lo que venga después se descarta.
+ */
+const CAB_FIN = /^\W*(informaci[oó]n nutricional|valor(es)? nutricional|nutrici[oó]n|palabras? clave|categor[ií]as?|comentarios?|deja un comentario|art[ií]culos relacionados|te puede interesar|s[ií]guenos|suscr[ií]bete|valoraci[oó]n)\b/i;
+
+/** Secciones que no son ingredientes aunque lo parezcan. */
+const CAB_OMITIR = /^\W*(equipamiento|utensilios?|material(es)?|herramientas)\b\W*:?\s*$/i;
+
+/** Consejos del autor: se guardan como notas, no como pasos. */
+const CAB_NOTAS = /^\W*(notas?|consejos?|trucos?|sugerencias?|observaciones)\b\W*:?\s*$/i;
+
+/**
+ * Adornos de las fichas de receta de los blogs: valoraciones, botones y
+ * metadatos. Los tiempos y las raciones se leen antes de tirarlos.
+ */
+const RE_RUIDO_FICHA = new RegExp(
+  [
+    '^\\W*(tiempo|raciones?|porciones|comensales|rinde|rendimiento|dificultad|coste)\\b',
+    '^\\W*(calor[ií]as|kcal|carbohidratos|prote[ií]nas|grasas?)\\b',
+    '^\\W*(autor|receta de|por)\\s*[:·]',
+    '^\\W*(imprimir|pinear|guardar|compartir|valorar|puntuar|a[ñn]adir a)\\b',
+    '^\\s*\\d+([.,]\\d+)?\\s*(de|\\/)\\s*\\d+\\s*(\\(|estrellas|votos)',
+    '^\\W*\\d+\\s*(votos?|comentarios?|valoraciones?)\\s*$',
+  ].join('|'),
+  'i'
+);
+
 /** Subcabeceras tipo "Para la salsa:" que dividen bloques de ingredientes. */
 const SUBCABECERA = /^\W*para (el|la|los|las)\s+.{2,40}\s*:\s*$/i;
 
@@ -57,6 +87,9 @@ const RE_INGREDIENTE = new RegExp(
 /** Reclamos de redes que nunca son ingredientes ni pasos. */
 const RE_PROMO = /^\W*(sigueme|s[ií]gueme|s[ií]guenos|guarda (este|el)|guardalo|gu[aá]rdalo|comenta|comparte|dale like|link en (la )?bio|enlace en (la )?bio|receta completa en|m[aá]s recetas|suscr[ií]bete|dispon[ií]ble en|deja tu comentario|no te olvides)/i;
 
+/** "3. Sofríe las verduras" o "Paso 2) ...": numeración de lista. */
+const RE_NUMERO_LISTA = /^\s*(?:paso\s*)?(\d{1,2})\s*[).:\-–]\s+(?=\S)/i;
+
 const RE_SIN_CANTIDAD = /\b(al gusto|a gusto|c\/n|cantidad necesaria|el que quieras|opcional|para servir|para decorar|para acompanar|para freir)\b/i;
 
 /* ------------------------------------------------------------------ */
@@ -74,7 +107,8 @@ function limpiarLinea(linea) {
 
 /** Parece un paso: empieza por un verbo de cocina, o es una frase larga. */
 function pareceInstruccion(texto) {
-  const limpio = quitarEmojis(texto);
+  // "1. Sofríe las verduras": se juzga lo que hay tras el número.
+  const limpio = quitarEmojis(texto).replace(RE_NUMERO_LISTA, '');
   const n = normalizar(limpio);
   if (!n) return false;
   // Una línea que abre con cantidad, o un "al gusto", es lista de la compra.
@@ -90,7 +124,7 @@ function pareceInstruccion(texto) {
 
 /** Parece un ingrediente: corto, con cantidad o unidad reconocible. */
 function pareceIngrediente(texto) {
-  const limpio = quitarEmojis(texto);
+  const limpio = quitarEmojis(texto).replace(RE_NUMERO_LISTA, '');
   if (!limpio) return false;
   const palabras = limpio.split(/\s+/).length;
   if (palabras > 12) return false;
@@ -204,11 +238,47 @@ export function parseReceta(texto, pistas = {}) {
 
   const urls = bruto.match(RE_URL) || [];
 
-  const lineas = bruto
-    .split('\n')
+  const lineasBrutas = bruto.split('\n');
+
+  // Las páginas de recetas siguen con tabla nutricional, etiquetas y
+  // comentarios: nada de eso es la receta, así que se corta ahí.
+  const corte = lineasBrutas.findIndex((l) => CAB_FIN.test(limpiarLinea(quitarEmojis(l))));
+  const utiles = corte > 0 ? lineasBrutas.slice(0, corte) : lineasBrutas;
+
+  // Los consejos del autor se guardan como notas, no como pasos.
+  const notas = [];
+  let enNotas = false;
+  let enOmitida = false;
+  const lineas = utiles
     .map((l) => l.replace(RE_URL, ' ').replace(RE_HASHTAG, ' ').replace(RE_ARROBA, ' '))
     .map((l) => l.replace(/\s{2,}/g, ' ').trimEnd())
-    .map((l) => (RE_PROMO.test(limpiarLinea(quitarEmojis(l))) ? '' : l));
+    .map((l) => {
+      const limpio = limpiarLinea(quitarEmojis(l));
+      if (!limpio) return l;
+      if (CAB_NOTAS.test(limpio)) {
+        enNotas = true;
+        enOmitida = false;
+        return '';
+      }
+      if (CAB_OMITIR.test(limpio)) {
+        enOmitida = true;
+        enNotas = false;
+        return '';
+      }
+      // Una cabecera de receta reabre la lectura normal.
+      if (CAB_INGREDIENTES.test(limpio) || CAB_PASOS.test(limpio) || SUBCABECERA.test(limpio)) {
+        enNotas = false;
+        enOmitida = false;
+        return l;
+      }
+      if (enNotas) {
+        notas.push(limpio);
+        return '';
+      }
+      if (enOmitida) return '';
+      if (RE_PROMO.test(limpio) || RE_RUIDO_FICHA.test(limpio)) return '';
+      return l;
+    });
 
   // --- Localizar secciones ---
   let iIng = -1;
@@ -242,7 +312,7 @@ export function parseReceta(texto, pistas = {}) {
   let grupoActual = '';
 
   const añadirIngrediente = (linea) => {
-    const ing = parseIngrediente(linea);
+    const ing = parseIngrediente(linea.replace(RE_NUMERO_LISTA, ''));
     if (!ing.nombre || ing.nombre.length < 2) return;
     if (grupoActual) ing.grupo = grupoActual;
     ingredientes.push(ing);
@@ -340,11 +410,9 @@ export function parseReceta(texto, pistas = {}) {
     return parseInt(m[2] || m[1], 10) || null;
   })();
 
-  // El tiempo solo es fiable en la cabecera ("Tiempo: 40 min", "en 20 minutos"):
+  // El tiempo solo es fiable en la cabecera o en la ficha de la receta:
   // dentro de los pasos hay muchos "2 minutos por cada lado" que no son el total.
   const minutos = (() => {
-    const etiquetado = bruto.match(/tiempo\s*(?:total|de preparaci[oó]n)?\s*[:=]?\s*([^\n|]{1,24})/i);
-    const cabecera = lineas.slice(0, iIng !== -1 ? Math.max(1, iIng) : 3).join(' ');
     const leer = (fuente) => {
       if (!fuente) return 0;
       const horas = fuente.match(/(\d+(?:[.,]\d+)?)\s*(?:h\b|horas?)/i);
@@ -354,8 +422,23 @@ export function parseReceta(texto, pistas = {}) {
       if (mins) total += parseInt(mins[1], 10);
       return total;
     };
-    const total = leer(etiquetado && etiquetado[1]) || leer(cabecera);
-    return total > 0 ? Math.round(total) : null;
+    const tras = (etiqueta) => {
+      const m = bruto.match(new RegExp(`${etiqueta}[^\\n\\d]{0,14}([^\\n|]{1,20})`, 'i'));
+      return m ? leer(m[1]) : 0;
+    };
+
+    // "Tiempo total" manda sobre los parciales de la ficha.
+    const total = tras('tiempo\\s+total');
+    if (total) return Math.round(total);
+
+    // Si la ficha los separa, el tiempo real es la suma.
+    const suma = tras('tiempo\\s+de\\s+preparaci[oó]n') + tras('tiempo\\s+de\\s+(?:cocci[oó]n|cocinado|horno|coccion)');
+    if (suma) return Math.round(suma);
+
+    const etiquetado = bruto.match(/tiempo\s*[:=]?\s*([^\n|]{1,24})/i);
+    const cabecera = lineas.slice(0, iIng !== -1 ? Math.max(1, iIng) : 3).join(' ');
+    const encontrado = leer(etiquetado && etiquetado[1]) || leer(cabecera);
+    return encontrado > 0 ? Math.round(encontrado) : null;
   })();
 
   return {
@@ -366,6 +449,6 @@ export function parseReceta(texto, pistas = {}) {
     raciones,
     minutos,
     url: pistas.url || urls[0] || '',
-    notas: '',
+    notas: notas.join('\n'),
   };
 }
